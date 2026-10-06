@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NOPAL RACEBOX</title>
+<style>
+:root{--bg:#0b0b0f;--card:#16161d;--tx:#f2f2f5;--mu:#8b8b99;--ac:#ff3b30;--ok:#30d158;--bd:#262631;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b0b0f}}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f3f3f6;--card:#fff;--tx:#14141a;--mu:#6a6a78;--bd:#dcdce4}}
+:root[data-theme="dark"]{--bg:#0b0b0f;--card:#16161d;--tx:#f2f2f5;--mu:#8b8b99;--bd:#262631}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:12px}
+h1{font-size:18px;letter-spacing:3px;margin:4px 0 10px;text-align:center}h1 b{color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.chip{flex:0 0 auto;padding:8px 12px;border-radius:20px;border:1px solid var(--bd);background:transparent;color:var(--tx);font-weight:600;font-size:13px}
+.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.spd{font-size:84px;font-weight:800;text-align:center;line-height:1;font-variant-numeric:tabular-nums}
+.unit{text-align:center;color:var(--mu);font-size:13px;margin-bottom:6px}
+.tim{font-size:52px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;font-family:ui-monospace,Menlo,Consolas,monospace}
+.st{text-align:center;font-weight:700;margin:6px 0;min-height:22px}
+.mu{color:var(--mu);font-size:12px}
+.btns{display:flex;gap:8px;margin-top:10px}
+button{font:inherit;cursor:pointer}
+.big{flex:1;padding:16px;border:0;border-radius:14px;font-weight:800;font-size:18px;color:#fff;background:var(--ok)}
+.big.stop{background:var(--ac)}
+.sm{padding:12px;border-radius:14px;border:1px solid var(--bd);background:transparent;color:var(--tx);font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;text-align:center}
+.grid div{background:var(--bg);border-radius:10px;padding:8px}.grid b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+.h{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--bd)}
+.h:first-of-type{border-top:0}.h .t{font-weight:700;font-size:18px;font-variant-numeric:tabular-nums}
+.best{color:var(--ok)}.x{background:none;border:0;color:var(--mu);font-size:18px;padding:4px 8px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--mu);margin-right:5px}
+.dot.g{background:var(--ok)}.dot.y{background:#ffd60a}.dot.r{background:var(--ac)}
+</style></head><body>
+<h1>NOPAL <b>RACEBOX</b></h1>
+
+<div class="card">
+  <div class="chips" id="modes"></div>
+  <div class="row" style="margin-top:8px"><span class="mu"><span class="dot" id="dot"></span><span id="gps">GPS belum aktif</span></span><span class="mu" id="rule"></span></div>
+</div>
+
+<div class="card">
+  <div class="spd" id="spd">0</div><div class="unit">km/jam</div>
+  <div class="tim" id="tim">0.000</div>
+  <div class="st" id="st">Pilih mode lalu tekan START</div>
+  <div class="grid"><div><span class="mu">Top Speed</span><b id="top">0</b></div><div><span class="mu">Jarak (m)</span><b id="dst">0</b></div><div><span class="mu">Rekor Mode</span><b id="rec">-</b></div></div>
+  <div class="btns"><button class="big" id="go">START</button><button class="sm" id="rst">Reset</button></div>
+  <div class="btns"><button class="sm" id="demo" style="flex:1">Mode Demo (tanpa GPS)</button><button class="sm" id="thm">Tema</button></div>
+</div>
+
+<div class="card">
+  <div class="row"><b>Riwayat Waktu</b><span><button class="sm" id="csv" style="padding:6px 10px">CSV</button> <button class="sm" id="clr" style="padding:6px 10px">Hapus Semua</button></span></div>
+  <div id="hist" style="margin-top:6px"></div>
+</div>
+<p class="mu" style="text-align:center">Gunakan hanya di sirkuit/lintasan tertutup. Pasang HP dengan aman, jangan dilihat saat berkendara.</p>
+
+<script>
+(function(){
+"use strict";
+var MODES=[{id:"0-60",a:0,b:60},{id:"0-100",a:0,b:100},{id:"0-150",a:0,b:150},{id:"0-200",a:0,b:200},{id:"60-100",a:60,b:100},{id:"100-200",a:100,b:200},{id:"201 m",d:201},{id:"402 m",d:402}];
+var $=function(i){return document.getElementById(i)};
+var mode=MODES[1],S="idle",prev=null,t0=0,dist=0,top=0,raf=0,watch=null,demoT=null,isDemo=false,hist=[],wl=null,lastFix=0;
+var MOVE=5,mv=0,mvT=0; // km/jam ambang mulai bergerak
+
+function load(){try{hist=JSON.parse(localStorage.getItem("nopal_hist")||"[]");if(!Array.isArray(hist))hist=[]}catch(e){hist=[]}}
+function save(){try{localStorage.setItem("nopal_hist",JSON.stringify(hist))}catch(e){}}
+function fmt(ms){return (ms/1000).toFixed(3)}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+function rule(){$("rule").textContent=mode.d?"Selesai di "+mode.d+" m":(mode.a?"Mulai di "+mode.a+" km/j":"Mulai saat bergerak")+" → "+mode.b+" km/j"}
+function drawModes(){var h="";MODES.forEach(function(m,i){h+='<button class="chip'+(m===mode?" on":"")+'" data-i="'+i+'">'+m.id+(m.d?"":" km/j")+'</button>'});$("modes").innerHTML=h;rule();rec()}
+$("modes").addEventListener("click",function(e){var b=e.target.closest(".chip");if(!b)return;if(S==="armed"||S==="run"){return}mode=MODES[+b.dataset.i];reset();drawModes()});
+
+function best(id){var b=null;hist.forEach(function(r){if(r.mode===id&&!r.demo&&(b===null||r.ms<b))b=r.ms});return b}
+function rec(){var b=best(mode.id);$("rec").textContent=b===null?"-":fmt(b)}
+function drawHist(){var best_={};hist.forEach(function(r){if(!r.demo&&(best_[r.mode]===undefined||r.ms<best_[r.mode]))best_[r.mode]=r.ms});
+ if(!hist.length){$("hist").innerHTML='<div class="mu" style="padding:10px 0">Belum ada catatan.</div>';return}
+ $("hist").innerHTML=hist.map(function(r){var isB=!r.demo&&best_[r.mode]===r.ms;
+ return '<div class="h"><div><b>'+esc(r.mode)+(r.demo?' <span class="mu">(DEMO)</span>':'')+'</b><div class="mu">'+esc(r.date)+' · Top '+r.top+' km/j</div></div><div class="t'+(isB?' best':'')+'">'+fmt(r.ms)+' s'+(isB?' ★':'')+'</div><button class="x" data-id="'+r.id+'">✕</button></div>'}).join("")}
+$("hist").addEventListener("click",function(e){var b=e.target.closest(".x");if(!b)return;var id=+b.dataset.id;hist=hist.filter(function(r){return r.id!==id});save();drawHist();rec()});
+$("clr").onclick=function(){if(hist.length&&confirm("Hapus semua riwayat?")){hist=[];save();drawHist();rec()}};
+$("csv").onclick=function(){if(!hist.length)return;var c="Mode,Waktu(s),TopSpeed(km/j),Tanggal,Demo\n"+hist.map(function(r){return [r.mode,fmt(r.ms),r.top,'"'+r.date+'"',r.demo?"ya":"tidak"].join(",")}).join("\n");
+ try{var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([c],{type:"text/csv"}));a.download="nopal-racebox.csv";a.click()}catch(e){alert("Unduh tidak didukung di sini.")}};
+
+function gps(txt,c){$("gps").textContent=txt;$("dot").className="dot "+(c||"")}
+function status(t){$("st").textContent=t}
+function setBtn(){var g=$("go");if(S==="armed"||S==="run"){g.textContent="BATAL";g.className="big stop"}else{g.textContent="START";g.className="big"}}
+
+function tick(){if(S==="run"){$("tim").textContent=fmt(performance.now()-t0);raf=requestAnimationFrame(tick)}}
+
+// Pemrosesan titik GPS: v dalam km/jam, t dalam ms (performance.now)
+function fix(v,t){core(v,t);try{NR.onFix&&NR.onFix(v,t,S,dist)}catch(e){}}
+function core(v,t){
+ v=Math.max(0,v);$("spd").textContent=Math.round(v);
+ var p=prev;prev={v:v,t:t};
+ if(S==="armed"){
+  if(mode.a>0){ // mulai saat melewati kecepatan awal
+   if(p&&p.v<mode.a&&v>=mode.a){var f=(mode.a-p.v)/(v-p.v);begin(p.t+f*(t-p.t),mode.a,v)}
+   else if(!p&&v>=mode.a)begin(t,v,v);
+  }else if(v>=MOVE){if(!mv){mvT=(p&&p.v<MOVE)?p.t:t}mv++;if(mv>=2)begin(mvT,v,v)}else{mv=0}
+  return}
+ if(S==="run"){
+  var dt=(t-p.t)/1000,dd=((p.v+v)/2/3.6)*dt;
+  if(v>top)top=v;
+  if(mode.d){
+   if(dist+dd>=mode.d){var f2=dd>0?(mode.d-dist)/dd:1;dist=mode.d;finish(p.t+f2*(t-p.t))}
+   else{dist+=dd}
+  }else{
+   dist+=dd;
+   if(v>=mode.b){var f3=v>p.v?(mode.b-p.v)/(v-p.v):1;f3=Math.min(1,Math.max(0,f3));finish(p.t+f3*(t-p.t))}
+  }
+  $("top").textContent=Math.round(top);$("dst").textContent=Math.round(dist)}
+}
+function begin(ts,v0,v){S="run";try{NR.onBegin&&NR.onBegin(ts)}catch(e){}t0=ts;dist=0;top=Math.max(v0,v);status("🏁 BERJALAN...");setBtn();cancelAnimationFrame(raf);raf=requestAnimationFrame(tick)}
+function finish(te){
+ var ms=te-t0;S="done";cancelAnimationFrame(raf);$("tim").textContent=fmt(ms);
+ var prevBest=best(mode.id);
+ hist.unshift({id:Date.now(),mode:mode.id,ms:Math.round(ms),top:Math.round(top),date:new Date().toLocaleString("id-ID"),demo:isDemo});
+ if(hist.length>300)hist.length=300;save();drawHist();rec();
+ status(!isDemo&&(prevBest===null||ms<prevBest)?"✅ SELESAI — REKOR BARU!":"✅ SELESAI");
+ stopSrc();setBtn();try{NR.onFinish&&NR.onFinish(ms,top)}catch(e){}}
+
+function startGPS(){
+ if(!("geolocation" in navigator)){gps("GPS tidak didukung","r");status("Browser tidak mendukung GPS. Pakai Mode Demo.");return false}
+ gps("Mencari sinyal GPS...","y");
+ watch=navigator.geolocation.watchPosition(function(p){
+  var c=p.coords,sp=c.speed;
+  if(sp===null||isNaN(sp)){gps("GPS aktif, kecepatan tidak tersedia","y");return}
+  lastFix=Date.now();try{NR.pos&&NR.pos(c)}catch(e){}var acc=c.accuracy;
+  gps("GPS aktif ±"+Math.round(acc)+" m",acc<=15?"g":"y");
+  if(acc>30&&S==="armed"){gps("GPS kurang akurat (±"+Math.round(acc)+" m), tunggu...","y");return}fix(sp*3.6,performance.now());
+ },function(e){
+  var m=e.code===1?"Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini.":e.code===2?"Posisi tidak tersedia.":"GPS timeout.";
+  gps(m,"r");status(m);
+ },{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+ return true}
+function stopSrc(){if(watch!==null){try{navigator.geolocation.clearWatch(watch)}catch(e){}watch=null}
+ if(demoT){clearInterval(demoT);demoT=null}
+ if(wl){try{wl.release()}catch(e){}wl=null}
+ gps(isDemo?"Demo selesai":"GPS berhenti","")}
+function startDemo(){
+ gps("MODE DEMO (simulasi)","y");var st=performance.now()+1500;
+ demoT=setInterval(function(){var t=performance.now(),el=(t-st)/1000,v=el<0?0:Math.min(245,245*(1-Math.exp(-el/9)));
+  $("spd").textContent=Math.round(v);fix(v,t)},100)}
+
+function arm(demo){
+ if(S==="armed"||S==="run")return;
+ reset();isDemo=!!demo;S="armed";prev=null;mv=0;setBtn();
+ status(mode.a?"Siap — timer baru jalan saat "+mode.a+" km/j":"Siap — timer BELUM jalan, menunggu motor bergerak");
+ if(demo){startDemo()}else{if(!startGPS()){S="idle";setBtn();return}}
+ try{if(navigator.wakeLock)navigator.wakeLock.request("screen").then(function(l){wl=l}).catch(function(){})}catch(e){}
+}
+function reset(){cancelAnimationFrame(raf);stopSrc();S="idle";prev=null;dist=0;top=0;$("tim").textContent="0.000";$("spd").textContent="0";$("top").textContent="0";$("dst").textContent="0";status("Pilih mode lalu tekan START");setBtn();gps("GPS belum aktif","")}
+
+$("go").onclick=function(){if(S==="armed"||S==="run"){reset()}else{arm(false)}};
+$("rst").onclick=reset;
+$("demo").onclick=function(){if(S==="armed"||S==="run")return;arm(true)};
+$("thm").onclick=function(){var r=document.documentElement,d=r.getAttribute("data-theme");r.setAttribute("data-theme",d==="light"?"dark":"light")};
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"&&(S==="armed"||S==="run")&&!isDemo&&!wl&&navigator.wakeLock){try{navigator.wakeLock.request("screen").then(function(l){wl=l}).catch(function(){})}catch(e){}}});
+
+window.NR={H:function(){return hist},save:save,draw:function(){drawHist();rec()},arm:arm,S:function(){return S},mode:function(){return mode},demo:function(){return isDemo},setMove:function(x){MOVE=x}};
+load();drawModes();drawHist();setBtn();
+})();
+</script>
+<script>
+(function(){
+"use strict";
+var N=window.NR,$=function(i){return document.getElementById(i)},L=[];
+var cfg={snd:1,voice:1,vib:1,rep:0,tree:0,vol:.7,tone:880,type:"sine"};
+try{Object.assign(cfg,JSON.parse(localStorage.getItem("nopal_cfg")||"{}"))}catch(e){}
+function sv(){try{localStorage.setItem("nopal_cfg",JSON.stringify(cfg))}catch(e){}}
+function log(m){L.push(new Date().toLocaleTimeString("id-ID")+" "+m);if(L.length>80)L.shift();if($("dbg"))$("dbg").textContent=L.join("\n");try{localStorage.setItem("nopal_log",JSON.stringify(L))}catch(e){}}
+window.addEventListener("error",function(e){log("ERROR "+e.message)});
+window.addEventListener("unhandledrejection",function(e){log("REJECT "+(e.reason&&e.reason.message||e.reason))});
+var m=document.createElement("meta");m.name="theme-color";m.content="#ff3b30";document.head.appendChild(m);
+var css=document.createElement("style");css.textContent=".sw{display:flex;flex-wrap:wrap;gap:6px}.sw .sm{padding:8px 10px;font-size:13px}canvas{width:100%;border-radius:8px;background:var(--bg);margin:4px 0}#tree{display:flex;gap:10px;justify-content:center;margin:6px 0}.lt{width:22px;height:22px;border-radius:50%;background:var(--bd)}.lt.a{background:#ffd60a}.lt.g{background:var(--ok)}.o2{background:var(--ac)!important;color:#fff!important;border-color:var(--ac)!important}#dim{position:fixed;inset:0;background:#000;opacity:.55;pointer-events:none;display:none;z-index:9}pre{white-space:pre-wrap;font-size:11px;max-height:140px;overflow:auto}";document.head.appendChild(css);
+function fmt(ms){return (ms/1000).toFixed(3)}
+function dl(b,n){try{var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=n;a.click()}catch(e){alert("Unduh tidak didukung di sini.")}}
+// ---- suara, getar, notifikasi
+var ac=null;
+function beep(f,d){if(!cfg.snd)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume();var o=ac.createOscillator(),g=ac.createGain();o.type=cfg.type;o.frequency.value=f||cfg.tone;g.gain.value=cfg.vol;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+(d||.15))}catch(e){log("beep "+e.message)}}
+function say(t){if(!cfg.voice||!window.speechSynthesis)return;try{var u=new SpeechSynthesisUtterance(t);u.lang="id-ID";u.volume=cfg.vol;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+function vib(p){if(cfg.vib&&navigator.vibrate)try{navigator.vibrate(p)}catch(e){}}
+function notify(t){try{if(window.Notification&&Notification.permission==="granted")new Notification("NOPAL RACEBOX",{body:t})}catch(e){}}
+// ---- UI
+var hc=$("hist").parentNode,P=hc.parentNode;
+function card(h,id){var d=document.createElement("div");d.className="card";if(id)d.id=id;d.innerHTML=h;P.insertBefore(d,hc);return d}
+$("st").insertAdjacentHTML("afterend",'<div class="mu" style="text-align:center" id="pred"></div><div class="mu" style="text-align:center" id="spl"></div>');
+$("tim").insertAdjacentHTML("beforebegin",'<div id="tree"><i class="lt"></i><i class="lt"></i><i class="lt"></i><i class="lt"></i></div>');
+var dim=document.createElement("div");dim.id="dim";document.body.appendChild(dim);
+var det=card('<b id="dt"></b><div class="mu" id="di"></div><canvas id="c1" width="600" height="220"></canvas><div class="mu">Grafik kecepatan (abu = rekor terbaik)</div><canvas id="c2" width="600" height="220"></canvas><div class="mu">Akselerasi (G)</div><canvas id="c3" width="600" height="220"></canvas><div class="mu">Peta rute (hijau = start)</div><button class="sm" id="shr" style="margin-top:6px">Bagikan / Simpan Gambar</button>',"det");det.style.display="none";
+var set=card('<b>Pengaturan, Sensor &amp; Alat</b><div class="sw" id="tg" style="margin:8px 0"></div><div class="row"><span class="mu">Volume</span><input type="range" id="vol" min="0" max="1" step="0.1" style="flex:1"><select id="tone"><option value="sine:880">Beep</option><option value="sine:440">Rendah</option><option value="sine:1320">Tinggi</option><option value="square:600">Klakson</option></select></div><div class="sw" id="ac" style="margin:8px 0"></div><div class="mu" id="info"></div><div class="mu" id="sens"></div><div class="mu" id="stats"></div>');
+var lap=card('<b>Lap Timer Sirkuit</b><div class="sw" id="lb" style="margin:8px 0"></div><div class="mu" id="lt">Simpan lokasi start/finish lalu mulai lap. Lap terhitung saat melewati titik itu (radius 25 m).</div>');
+var dbgc=card('<details><summary><b>Debug Log</b></summary><pre id="dbg"></pre></details>');
+function btn(p,t,f,k){var b=document.createElement("button");b.className="sm";b.textContent=t;b.onclick=function(){try{f(b)}catch(e){log(t+": "+e.message);alert(t+" gagal: "+e.message)}};if(k){b.className+=cfg[k]?" o2":"";b.onclick=function(){cfg[k]=cfg[k]?0:1;b.classList.toggle("o2",!!cfg[k]);sv()}}$(p).appendChild(b);return b}
+[["Beep","snd"],["Suara","voice"],["Getar","vib"],["Ulang Otomatis","rep"],["Pohon Natal","tree"]].forEach(function(a){btn("tg",a[0],null,a[1])});
+$("vol").value=cfg.vol;$("vol").oninput=function(){cfg.vol=+this.value;sv();beep()};
+$("tone").value=cfg.type+":"+cfg.tone;$("tone").onchange=function(){var p=this.value.split(":");cfg.type=p[0];cfg.tone=+p[1];sv();beep()};
+btn("ac","Layar Penuh",function(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()});
+btn("ac","Kunci Rotasi",function(b){if(!screen.orientation||!screen.orientation.lock)return alert("Tidak didukung browser ini.");if(b.classList.contains("o2")){screen.orientation.unlock();b.classList.remove("o2")}else{screen.orientation.lock(screen.orientation.type).then(function(){b.classList.add("o2")}).catch(function(){alert("Kunci rotasi hanya jalan dalam mode Layar Penuh di Android.")})}});
+btn("ac","Redup/Hemat Baterai",function(b){var s=dim.style.display!=="block";dim.style.display=s?"block":"none";b.classList.toggle("o2",s)});
+btn("ac","Anti-Matahari",function(b){var r=document.documentElement,s=r.getAttribute("data-theme")!=="light";r.setAttribute("data-theme",s?"light":"dark");b.classList.toggle("o2",s)});
+btn("ac","Notifikasi",function(){if(!window.Notification)return alert("Tidak didukung.");Notification.requestPermission().then(function(p){notify("Notifikasi aktif ("+p+")")})});
+btn("ac","Sensor G/Kompas",sensors);
+btn("ac","Backup",function(){dl(new Blob([JSON.stringify({v:1,hist:N.H(),cfg:cfg})],{type:"application/json"}),"nopal-backup.json")});
+var fi=document.createElement("input");fi.type="file";fi.accept=".json";fi.style.display="none";document.body.appendChild(fi);
+btn("ac","Import",function(){fi.click()});
+fi.onchange=function(){var f=fi.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var d=JSON.parse(r.result),h=N.H(),ids={};h.forEach(function(x){ids[x.id]=1});var n=0;(d.hist||[]).forEach(function(x){if(x&&x.id&&x.ms&&!ids[x.id]){h.push(x);n++}});h.sort(function(a,b){return b.id-a.id});N.save();N.draw();alert(n+" catatan diimpor.")}catch(e){alert("File tidak valid.")}};r.readAsText(f);fi.value=""};
+btn("ac","Reset Data",function(){if(confirm("Hapus SEMUA data & pengaturan?")){N.H().length=0;N.save();N.draw();try{["nopal_cfg","nopal_start","nopal_log"].forEach(function(k){localStorage.removeItem(k)})}catch(e){}alert("Data direset.")}});
+// ---- sensor
+var sOn=false;
+function sensors(b){if(sOn)return;var go=function(){sOn=true;b.classList.add("o2");
+ addEventListener("devicemotion",function(e){var a=e.accelerationIncludingGravity,r=e.rotationRate;sg.g=a&&a.x!=null?Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z)/9.81:null;sg.r=r&&r.alpha!=null?Math.round(Math.abs(r.alpha)+Math.abs(r.beta)+Math.abs(r.gamma)):null});
+ addEventListener("deviceorientationabsolute",function(e){if(e.alpha!=null)sg.h=Math.round(360-e.alpha)});addEventListener("deviceorientation",function(e){if(sg.h==null&&e.webkitCompassHeading!=null)sg.h=Math.round(e.webkitCompassHeading)})};
+ if(window.DeviceMotionEvent&&DeviceMotionEvent.requestPermission)DeviceMotionEvent.requestPermission().then(function(p){if(p==="granted")go();else alert("Izin sensor ditolak.")});else go()}
+var sg={};
+// ---- balap: split, prediksi, reaksi
+var run=false,t0=0,smp=[],rte=[],spl=[],lastD=0,lastT=0,rx=null,fs=false,greenT=null,tm=[],cur=null,SP=[20,100,201,402];
+function clr(){tm.forEach(clearTimeout);tm=[];document.querySelectorAll(".lt").forEach(function(e){e.className="lt"})}
+function tree(){clr();var Ls=document.querySelectorAll(".lt");greenT=null;[0,1,2].forEach(function(i){tm.push(setTimeout(function(){if(N.S()==="armed"){Ls[i].className="lt a";beep(600,.15);vib(40)}},700*(i+1)))});tm.push(setTimeout(function(){if(N.S()==="armed"||N.S()==="run"){Ls[3].className="lt g";greenT=performance.now();beep(1400,.4)}},2800+Math.random()*1000))}
+function onArm(){if(N.S()==="armed"){say("Siap");rx=null;fs=false;greenT=null;$("pred").textContent="";$("spl").textContent="";if(cfg.tree&&!N.demo())tree()}else clr()}
+$("go").addEventListener("click",onArm);$("demo").addEventListener("click",onArm);$("rst").addEventListener("click",clr);
+Object.assign(N,{
+ pos:function(c){if(run&&rte.length<300)rte.push([+c.latitude.toFixed(6),+c.longitude.toFixed(6)])},
+ onBegin:function(ts){run=true;t0=ts;smp=[];rte=[];spl=[];lastD=0;lastT=ts;
+  if(cfg.tree&&!N.demo()){if(greenT===null)fs=true;else{rx=ts-greenT;if(rx<0){fs=true;rx=null}}}
+  $("pred").textContent=fs?"⚠ FALSE START":rx!=null?"Reaksi "+fmt(rx)+" s":"";
+  beep(1200,.3);say("Go");vib(200);notify("Rekaman dimulai")},
+ onFix:function(v,t,S,d){if(!run)return;if(smp.length<400)smp.push([Math.round(t-t0),Math.round(v*10)/10]);
+  SP.forEach(function(s,i){if(lastD<s&&d>=s&&d>lastD){var ts=lastT+(s-lastD)/(d-lastD)*(t-lastT),r={d:s,ms:Math.round(ts-t0)};spl.push(r);$("spl").textContent=spl.map(function(x){return x.d+"m "+fmt(x.ms)}).join(" · ");beep(700+i*250,.12);vib(i===0?[80]:i===1?[80,60,80]:[80,60,80,60,80]);if(s!==402)say(s+" meter "+(r.ms/1000).toFixed(2))}});
+  lastD=d;lastT=t;
+  var md=N.mode(),el=(t-t0)/1000,pr=null;if(S==="run"&&el>1){if(md.d){if(v>5)pr=el+(md.d-d)/(v/3.6)}else{var a=(v-md.a)/el;if(a>.5&&v<md.b)pr=el+(md.b-v)/a}}
+  if(pr&&pr>el)$("pred").textContent=(fs?"⚠ FALSE START · ":rx!=null?"Reaksi "+fmt(rx)+" · ":"")+"Prediksi ±"+pr.toFixed(2)+" s"},
+ onFinish:function(ms,top){run=false;clr();var H=N.H(),e=H[0],pb=null;H.slice(1).forEach(function(r){if(r.mode===e.mode&&!r.demo&&(pb===null||r.ms<pb))pb=r.ms});
+  e.samples=smp;e.splits=spl;e.route=rte;e.rx=rx;e.fs=fs;e.delta=pb===null?null:e.ms-pb;N.save();
+  say("Selesai "+(e.ms/1000).toFixed(2)+" detik");beep(660,.5);vib([300,100,300]);notify("Selesai: "+fmt(e.ms)+" s");
+  try{navigator.setAppBadge&&navigator.setAppBadge(H.length).catch(function(){})}catch(x){}
+  showRun(e);if(cfg.rep)setTimeout(function(){if(N.S()==="done")N.arm(N.demo())},4000)}
+});
+// ---- grafik & detail
+function plot(cv,ser,col,mx,my){var x=cv.getContext("2d"),w=cv.width,h=cv.height;x.clearRect(0,0,w,h);x.strokeStyle="#8886";x.lineWidth=1;x.strokeRect(30,8,w-38,h-30);x.fillStyle="#888";x.font="12px sans-serif";x.fillText(Math.round(my)+"",2,18);x.fillText((mx/1000).toFixed(1)+" s",w-50,h-6);
+ ser.forEach(function(s,k){if(!s||!s.length)return;x.beginPath();x.strokeStyle=col[k];x.lineWidth=2;s.forEach(function(p,i){var px=30+p[0]/mx*(w-38),py=h-22-p[1]/my*(h-30);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()})}
+function showRun(r){cur=r;det.style.display="block";$("dt").textContent=r.mode+" — "+fmt(r.ms)+" s"+(r.demo?" (DEMO)":"");
+ var i=["Top "+r.top+" km/j"];if(r.rx!=null)i.push("Reaksi "+fmt(r.rx)+" s");if(r.fs)i.push("FALSE START");if(r.delta!=null)i.push("Delta vs terbaik "+(r.delta>0?"+":"")+fmt(r.delta)+" s");(r.splits||[]).forEach(function(s){i.push(s.d+" m: "+fmt(s.ms)+" s")});$("di").textContent=i.join(" · ");
+ var S=r.samples||[],b=null;N.H().forEach(function(o){if(o!==r&&o.mode===r.mode&&o.demo===r.demo&&o.samples&&o.samples.length&&(!b||o.ms<b.ms))b=o});
+ var mx=Math.max(r.ms,b?b.ms:0,1000),my=Math.max(r.top,b?b.top:0,10)*1.1;plot($("c1"),[b?b.samples:null,S],["#888","#ff3b30"],mx,my);
+ var A=[];for(var k=2;k<S.length;k++){var dt=(S[k][0]-S[k-2][0])/1000;if(dt>0)A.push([S[k][0],Math.max(0,(S[k][1]-S[k-2][1])/3.6/dt/9.81)])}
+ var ma=Math.max.apply(null,A.map(function(p){return p[1]}).concat([.5]));plot($("c2"),[A],["#30d158"],mx,ma*1.1);
+ var c=$("c3"),x=c.getContext("2d"),R=r.route||[];x.clearRect(0,0,c.width,c.height);if(R.length<2)return;
+ var la=R.map(function(p){return p[0]}),lo=R.map(function(p){return p[1]}),a0=Math.min.apply(null,la),a1=Math.max.apply(null,la),o0=Math.min.apply(null,lo),o1=Math.max.apply(null,lo),k0=Math.cos(a0*Math.PI/180);
+ var sw=Math.max((o1-o0)*k0,1e-6),sh=Math.max(a1-a0,1e-6),sc=Math.min((c.width-40)/sw,(c.height-40)/sh);
+ function pt(p){return[20+(p[1]-o0)*k0*sc,c.height-20-(p[0]-a0)*sc]}
+ x.beginPath();x.strokeStyle="#ff3b30";x.lineWidth=3;R.forEach(function(p,i){var q=pt(p);i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])});x.stroke();var q=pt(R[0]);x.fillStyle="#30d158";x.beginPath();x.arc(q[0],q[1],6,0,7);x.fill()}
+$("hist").addEventListener("click",function(e){if(e.target.closest(".x"))return;var r=e.target.closest(".h");if(!r)return;var b=r.querySelector(".x"),id=b&&+b.dataset.id,run_=N.H().filter(function(x){return x.id===id})[0];if(run_){showRun(run_);det.scrollIntoView({behavior:"smooth"})}});
+$("shr").onclick=function(){if(!cur)return;var c=document.createElement("canvas");c.width=600;c.height=315;var x=c.getContext("2d");x.fillStyle="#0b0b0f";x.fillRect(0,0,600,315);x.fillStyle="#ff3b30";x.font="bold 26px sans-serif";x.fillText("NOPAL RACEBOX",24,48);x.fillStyle="#fff";x.font="bold 80px monospace";x.fillText(fmt(cur.ms)+" s",24,160);x.font="24px sans-serif";x.fillText(cur.mode+" · Top "+cur.top+" km/j",24,210);x.fillStyle="#8b8b99";x.fillText(cur.date,24,250);
+ c.toBlob(function(b){var f=new File([b],"nopal-racebox.png",{type:"image/png"});if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:"NOPAL RACEBOX"}).catch(function(){});else dl(b,"nopal-racebox.png")})};
+// ---- lap timer
+function hav(a,b,c,d){var R=6371000,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);return 2*R*Math.asin(Math.sqrt(h))}
+var lw=null,laps=[],lastLap=0,away=true;
+btn("lb","Simpan Lokasi Start",function(){if(!navigator.geolocation)return alert("GPS tidak didukung.");navigator.geolocation.getCurrentPosition(function(p){try{localStorage.setItem("nopal_start",JSON.stringify([p.coords.latitude,p.coords.longitude]))}catch(e){}$("lt").textContent="Lokasi start tersimpan ("+p.coords.latitude.toFixed(5)+", "+p.coords.longitude.toFixed(5)+")"},function(e){alert("Gagal ambil lokasi: "+e.message)},{enableHighAccuracy:true,timeout:15000})});
+btn("lb","Mulai/Stop Lap",function(b){if(lw!==null){navigator.geolocation.clearWatch(lw);lw=null;b.classList.remove("o2");return}
+ var st=null;try{st=JSON.parse(localStorage.getItem("nopal_start")||"null")}catch(e){}if(!st)return alert("Simpan lokasi start dulu.");
+ laps=[];lastLap=0;away=true;b.classList.add("o2");
+ lw=navigator.geolocation.watchPosition(function(p){var d=hav(p.coords.latitude,p.coords.longitude,st[0],st[1]),n=performance.now();if(d>60)away=true;
+  if(d<=25&&away&&(!lastLap||n-lastLap>15000)){if(lastLap){laps.push(n-lastLap);beep(1000,.3);say("Lap "+laps.length+", "+(laps[laps.length-1]/1000).toFixed(2));vib([150,80,150])}lastLap=n;away=false}
+  var bst=laps.length?Math.min.apply(null,laps):0;$("lt").textContent="Lap: "+laps.length+(laps.length?" · terakhir "+fmt(laps[laps.length-1])+" s · terbaik "+fmt(bst)+" s":" · menunggu melewati titik start")+" · jarak ke start "+Math.round(d)+" m"},function(e){$("lt").textContent="GPS: "+e.message},{enableHighAccuracy:true,maximumAge:0})});
+// ---- info berkala
+setInterval(function(){var c=navigator.connection||{},H=N.H().filter(function(r){return r.mode===N.mode().id&&!r.demo}).map(function(r){return r.ms}),o=(navigator.onLine?"Online":"Offline (data tersimpan lokal)")+(c.effectiveType?" · "+c.effectiveType:"")+(c.downlink?" · "+c.downlink+" Mbps":"")+" · GPS: "+("geolocation" in navigator?"didukung":"tidak ada");
+ $("info").textContent=o;$("sens").textContent=sOn?"G: "+(sg.g!=null?sg.g.toFixed(2):"-")+" · Rotasi: "+(sg.r!=null?sg.r+"°/s":"-")+" · Kompas: "+(sg.h!=null?sg.h+"°":"-"):"Sensor G / giroskop / kompas: tekan tombol Sensor.";
+ $("stats").textContent=H.length?"Statistik "+N.mode().id+" ("+H.length+" run): rata-rata "+fmt(H.reduce(function(a,b){return a+b},0)/H.length)+" s · terbaik "+fmt(Math.min.apply(null,H))+" s · terburuk "+fmt(Math.max.apply(null,H))+" s":"Statistik "+N.mode().id+": belum ada data."},1000);
+var mvSel=document.createElement("div");mvSel.className="row";mvSel.style.margin="8px 0";mvSel.innerHTML='<span class="mu">Ambang gerak (timer mulai)</span><select id="mvs"><option value="2">2 km/j (sensitif)</option><option value="5">5 km/j (normal)</option><option value="8">8 km/j (anti-geser)</option></select>';set.insertBefore(mvSel,$("info"));
+cfg.move=cfg.move||5;$("mvs").value=String(cfg.move);N.setMove(cfg.move);$("mvs").onchange=function(){cfg.move=+this.value;sv();N.setMove(cfg.move)};
+log("NOPAL RACEBOX siap");
+})();
+</script></body></html>
