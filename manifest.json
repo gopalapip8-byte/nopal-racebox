@@ -1,25 +1,25 @@
 {
   "name": "NOPAL RACEBOX",
   "short_name": "NOPAL",
-  "description": "GPS Timer untuk motor - ukur akselerasi 203m, 0-100 km/jam, dan 1/4 mile",
+  "description": "GPS Timer motor - 203m, 0-100 km/jam, 1/4 mile, lap timer sirkuit",
   "start_url": "/nopal-racebox/",
   "scope": "/nopal-racebox/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0a0a",
-  "theme_color": "#ff3b00",
+  "background_color": "#0b0b0f",
+  "theme_color": "#ff3b30",
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
